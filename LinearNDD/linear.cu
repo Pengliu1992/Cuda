@@ -593,7 +593,7 @@ int main() {
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
 	cudaEventRecord(start, 0);
-	for (int RelaxCount = 0; RelaxCount < 500; RelaxCount++)
+	for (int RelaxCount = 0; RelaxCount < 1000; RelaxCount++)
 	{
 		//if (RelaxCount == 2000) MyUpdategamma1(4.9);
 		//if (RelaxCount ==40) MyUpdategamma1(3.3);
