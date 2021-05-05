@@ -406,9 +406,9 @@ __global__ void UpdateSolutiontoA1(int *d_NumNodes, FEMElem* d_MyElem, FEMNode* 
 				ALocal[LocalPos] = NRsolition;
 				if (1)
 				{
-					B2 = -1 / d_MyElem[e].Area*(d_MyElem[e].Me[0][1] * pow(ALocal[0] - ALocal[1], 2)
-						+ d_MyElem[e].Me[1][2] * pow(ALocal[1] - ALocal[2], 2)
-						+ d_MyElem[e].Me[2][0] * pow(ALocal[2] - ALocal[0], 2));
+					B2 = -1 / d_MyElem[e].Area*(d_MyElem[e].Me[0][1] * (ALocal[0] - ALocal[1])* (ALocal[0] - ALocal[1])
+						+ d_MyElem[e].Me[1][2] * (ALocal[1] - ALocal[2])* (ALocal[1] - ALocal[2])
+						+ d_MyElem[e].Me[2][0] * (ALocal[2] - ALocal[0])* (ALocal[2] - ALocal[0]));
 					B = sqrt(B2);
 
 					if (B <= 0.6)
@@ -421,8 +421,8 @@ __global__ void UpdateSolutiontoA1(int *d_NumNodes, FEMElem* d_MyElem, FEMNode* 
 					}
 					else
 					{
-						V = 1 / MuFeCore + 3000.0*pow(B - 0.6, 3) / B;
-						VB2 = (B*9000.0*pow(B - 0.6, 2) - 3000.0*pow(B - 0.6, 3)) / B / B / 2 / B;
+						V = 1 / MuFeCore + 3000.0*(B - 0.6) *(B - 0.6) *(B - 0.6) / B;
+						VB2 = (B*9000.0*(B - 0.6) *(B - 0.6) - 3000.0*(B - 0.6)*(B - 0.6) *(B - 0.6) ) / B / B / 2 / B;
 						B2A = 0;
 
 						for (j = 0; j < 3; j++)
@@ -473,14 +473,14 @@ __global__ void UpdateVe(int *d_NumElem, FEMElem* d_MyElem, FEMNode* d_MyNode)
 	ALocal[0] = d_MyNode[d_MyElem[e].Nodes[0]].A0;
 	ALocal[1] = d_MyNode[d_MyElem[e].Nodes[1]].A0;
 	ALocal[2] = d_MyNode[d_MyElem[e].Nodes[2]].A0;
-	B2 = -1 / d_MyElem[e].Area*(d_MyElem[e].Me[0][1] * pow(ALocal[0] - ALocal[1], 2)
-		+ d_MyElem[e].Me[1][2] * pow(ALocal[1] - ALocal[2], 2)
-		+ d_MyElem[e].Me[2][0] * pow(ALocal[2] - ALocal[0], 2));
+	B2 = -1 / d_MyElem[e].Area*(d_MyElem[e].Me[0][1] * (ALocal[0] - ALocal[1])* (ALocal[0] - ALocal[1])
+		+ d_MyElem[e].Me[1][2] * (ALocal[1] - ALocal[2])* (ALocal[1] - ALocal[2])
+		+ d_MyElem[e].Me[2][0] * (ALocal[2] - ALocal[0])* (ALocal[2] - ALocal[0]));
 	B = sqrt(B2);
 	if (B <= 0.6)
 		V = 1 / MuFeCore;
 	else
-		V = 1 / MuFeCore + 3000.0*pow(B - 0.6, 3) / B;
+		V = 1 / MuFeCore + 3000.0*(B - 0.6) *(B - 0.6) *(B - 0.6) / B;
 	d_MyElem[e].Ve = V;
 }
 __global__ void Updategamma1OnDevice(int *d_NumElem, FEMElem* d_MyElem, FEMNode* d_MyNode, double *d_gamma1)

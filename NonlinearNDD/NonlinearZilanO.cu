@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
@@ -9,13 +9,13 @@
 #define Mu0 1.256637e-6
 #define pi 3.1415927
 #define MuFeCore 0.0020 //linear region of BH curve
-#define MaxNode 1300
-#define MaxElem 3000
+#define MaxNode 4000
+#define MaxElem 8000
 #define Init0 0.0
-#define NRCount 5
+#define NRCount 2
 
-#define CudaThrdNum 64
-#define CudaBlckNum 32
+#define CudaThrdNum 128
+#define CudaBlckNum 64
 
 #ifndef _TIMER_H_
 #define _TIMER_H_
@@ -71,26 +71,24 @@ int NumNodes, NumElem;
 FEMNode MyNode[MaxNode];
 FEMElem MyElem[MaxElem];
 double gamma1 = 100.0;
-double CurrentDensity = 1.43e6;
+double CurrentDensity = 1e6;
 //Device parameters for FEM
-int *d_NumNodes, *d_NumElem;
-double *d_gamma1;
-double *d_CurrentDensity;
-FEMNode *d_MyNode;
-FEMElem *d_MyElem;
-
+int* d_NumNodes, * d_NumElem;
+double* d_gamma1;
+double* d_CurrentDensity;
+FEMNode* d_MyNode;
+FEMElem* d_MyElem;
 
 void LoadMeshInfo()
 {
 	FILE* ip;
 	int i, flag = 0;
+
 	char filename[50];
 
 	char line[50];
 
-
-
-	sprintf(filename, "MeshInfo.mphtxt");
+	sprintf(filename, "3733.mphtxt");
 
 	if ((ip = fopen(filename, "r")) == NULL) {
 		printf("error opening the input data.\n");
@@ -164,6 +162,7 @@ void LoadMeshInfo()
 				{
 					fgets(line, sizeof(line), ip);
 					sscanf(line, "%d\n", &(MyElem[i].Type));
+					//	printf("\nType %d", MyElem[i].Type);
 				}
 			}
 		}
@@ -203,7 +202,7 @@ void FEM_Host_Data_Prepare()
 
 	{
 		MyElem[i].Js = 0;
-		if (MyElem[i].Type != 2)
+		if (0)//MyElem[i].Type != 2)
 			MyElem[i].Ve = 1.0 / Mu0;
 		else
 			MyElem[i].Ve = 1.0 / MuFeCore;
@@ -216,25 +215,25 @@ void FEM_Host_Data_Prepare()
 	{
 		x1 = MyNode[MyElem[i].Nodes[0]].x; x2 = MyNode[MyElem[i].Nodes[1]].x; x3 = MyNode[MyElem[i].Nodes[2]].x;
 		y1 = MyNode[MyElem[i].Nodes[0]].y; y2 = MyNode[MyElem[i].Nodes[1]].y; y3 = MyNode[MyElem[i].Nodes[2]].y;
-		MyElem[i].Area = 0.5*(x1*(y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+		MyElem[i].Area = 0.5 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
 		b1 = y2 - y3; c1 = x3 - x2;
 		b2 = y3 - y1; c2 = x1 - x3;
 		b3 = y1 - y2; c3 = x2 - x1;
 
-		MyElem[i].Me[0][0] = 1.0 / 4 / MyElem[i].Area*(b1*b1 + c1 * c1);
-		MyElem[i].Me[0][1] = 1.0 / 4 / MyElem[i].Area*(b1*b2 + c1 * c2);
-		MyElem[i].Me[0][2] = 1.0 / 4 / MyElem[i].Area*(b1*b3 + c1 * c3);
+		MyElem[i].Me[0][0] = 1.0 / 4 / MyElem[i].Area * (b1 * b1 + c1 * c1);
+		MyElem[i].Me[0][1] = 1.0 / 4 / MyElem[i].Area * (b1 * b2 + c1 * c2);
+		MyElem[i].Me[0][2] = 1.0 / 4 / MyElem[i].Area * (b1 * b3 + c1 * c3);
 
-		MyElem[i].Me[1][0] = 1.0 / 4 / MyElem[i].Area*(b1*b2 + c1 * c2);
-		MyElem[i].Me[1][1] = 1.0 / 4 / MyElem[i].Area*(b2*b2 + c2 * c2);
-		MyElem[i].Me[1][2] = 1.0 / 4 / MyElem[i].Area*(b2*b3 + c2 * c3);
+		MyElem[i].Me[1][0] = 1.0 / 4 / MyElem[i].Area * (b1 * b2 + c1 * c2);
+		MyElem[i].Me[1][1] = 1.0 / 4 / MyElem[i].Area * (b2 * b2 + c2 * c2);
+		MyElem[i].Me[1][2] = 1.0 / 4 / MyElem[i].Area * (b2 * b3 + c2 * c3);
 
-		MyElem[i].Me[2][0] = 1.0 / 4 / MyElem[i].Area*(b1*b3 + c1 * c3);
-		MyElem[i].Me[2][1] = 1.0 / 4 / MyElem[i].Area*(b3*b2 + c3 * c2);
-		MyElem[i].Me[2][2] = 1.0 / 4 / MyElem[i].Area*(b3*b3 + c3 * c3);
+		MyElem[i].Me[2][0] = 1.0 / 4 / MyElem[i].Area * (b1 * b3 + c1 * c3);
+		MyElem[i].Me[2][1] = 1.0 / 4 / MyElem[i].Area * (b3 * b2 + c3 * c2);
+		MyElem[i].Me[2][2] = 1.0 / 4 / MyElem[i].Area * (b3 * b3 + c3 * c3);
 
 		//get ElmRowSum[i][...] is gamma1 weighted row sum for ith node. 
-		//set 0
+				//set 0
 		for (j = 0; j < 3; j++)
 			for (k = 0; k < 3; k++)
 				MyElem[i].ElmRowSum[j][k] = 0;
@@ -299,28 +298,28 @@ void FEM_Host_Data_Prepare()
 	printf("Number of Nodes: %d   Number of Elements: %d\n", NumNodes, NumElem);
 
 }
-__global__ void ApplyCurrent(double *d_CurrentDensity, int *d_NumElem, FEMElem* d_MyElem)
+__global__ void ApplyCurrent(double* d_CurrentDensity, int* d_NumElem, FEMElem* d_MyElem)
 {
 	int e;
-	e = threadIdx.x + blockIdx.x*blockDim.x;
+	e = threadIdx.x + blockIdx.x * blockDim.x;
 	if (e >= *d_NumElem)
 		return;
 	if (d_MyElem[e].Type == 5)  d_MyElem[e].Js = (*d_CurrentDensity);
 	if (d_MyElem[e].Type == 7)  d_MyElem[e].Js = -(*d_CurrentDensity);
 }
-__global__ void JsSumCalculate(int *d_NumNodes, FEMElem* d_MyElem, FEMNode* d_MyNode)
+__global__ void JsSumCalculate(int* d_NumNodes, FEMElem* d_MyElem, FEMNode* d_MyNode)
 {
-	int node = threadIdx.x + blockIdx.x*blockDim.x;
+	int node = threadIdx.x + blockIdx.x * blockDim.x;
 	if (node >= *d_NumNodes)
 		return;
 	int e;
 	d_MyNode[node].JsSum = 0;
 	for (e = 0; e < d_MyNode[node].NumEle; e++)
-		d_MyNode[node].JsSum += (d_MyElem[d_MyNode[node].EleID[e]].Js)*(d_MyElem[d_MyNode[node].EleID[e]].Area) / 3;
+		d_MyNode[node].JsSum += (d_MyElem[d_MyNode[node].EleID[e]].Js) * (d_MyElem[d_MyNode[node].EleID[e]].Area) / 3;
 }
-__global__ void SumNeiborJsSumCalculate(int *d_NumNodes, FEMElem* d_MyElem, FEMNode* d_MyNode)
+__global__ void SumNeiborJsSumCalculate(int* d_NumNodes, FEMElem* d_MyElem, FEMNode* d_MyNode)
 {
-	int node = threadIdx.x + blockIdx.x*blockDim.x;
+	int node = threadIdx.x + blockIdx.x * blockDim.x;
 	if (node >= *d_NumNodes)
 		return;
 	int n;
@@ -328,9 +327,9 @@ __global__ void SumNeiborJsSumCalculate(int *d_NumNodes, FEMElem* d_MyElem, FEMN
 	for (n = 0; n < d_MyNode[node].NumNeiborNodes; n++)
 		d_MyNode[node].SumNeiborJsSum += (d_MyNode[d_MyNode[node].NeiborNode[n]].JsSum);
 }
-__global__ void SumNodeRHSContriCalculate(int *d_NumNodes, FEMElem* d_MyElem, FEMNode* d_MyNode)
+__global__ void SumNodeRHSContriCalculate(int* d_NumNodes, FEMElem* d_MyElem, FEMNode* d_MyNode)
 {
-	int node = threadIdx.x + blockIdx.x*blockDim.x;
+	int node = threadIdx.x + blockIdx.x * blockDim.x;
 	if (node >= *d_NumNodes)
 		return;
 	int e;
@@ -339,11 +338,11 @@ __global__ void SumNodeRHSContriCalculate(int *d_NumNodes, FEMElem* d_MyElem, FE
 		d_MyNode[node].SumRHSContri += d_MyElem[d_MyNode[node].EleID[e]].RHSContri[d_MyNode[node].EleOrd[e]];
 
 }
-__global__ void ElmRHSContriCalculate(int *d_NumElem, FEMElem* d_MyElem, FEMNode* d_MyNode)
+__global__ void ElmRHSContriCalculate(int* d_NumElem, FEMElem* d_MyElem, FEMNode* d_MyNode)
 {
 
 	int e;
-	e = threadIdx.x + blockIdx.x*blockDim.x;
+	e = threadIdx.x + blockIdx.x * blockDim.x;
 	if (e >= *d_NumElem)
 		return;
 
@@ -358,9 +357,9 @@ __global__ void ElmRHSContriCalculate(int *d_NumElem, FEMElem* d_MyElem, FEMNode
 	}
 
 }
-__global__ void UpdateSolutiontoA1(int *d_NumNodes, FEMElem* d_MyElem, FEMNode* d_MyNode, double *d_gamma1)
+__global__ void UpdateSolutiontoA1(int* d_NumNodes, FEMElem* d_MyElem, FEMNode* d_MyNode, double* d_gamma1)
 {
-	int node = threadIdx.x + blockIdx.x*blockDim.x;
+	int node = threadIdx.x + blockIdx.x * blockDim.x;
 	if (node >= *d_NumNodes)
 		return;
 
@@ -405,26 +404,25 @@ __global__ void UpdateSolutiontoA1(int *d_NumNodes, FEMElem* d_MyElem, FEMNode* 
 				ALocal[1] = d_MyNode[d_MyElem[e].Nodes[1]].A0;
 				ALocal[2] = d_MyNode[d_MyElem[e].Nodes[2]].A0;
 				ALocal[LocalPos] = NRsolition;
-				if (d_MyElem[e].Type == 2)
+				if (1)
 				{
-					B2 = -1 / d_MyElem[e].Area*(d_MyElem[e].Me[0][1] * (ALocal[0] - ALocal[1]) * (ALocal[0] - ALocal[1])
+					B2 = -1 / d_MyElem[e].Area * (d_MyElem[e].Me[0][1] * (ALocal[0] - ALocal[1]) * (ALocal[0] - ALocal[1])
 						+ d_MyElem[e].Me[1][2] * (ALocal[1] - ALocal[2]) * (ALocal[1] - ALocal[2])
-						+ d_MyElem[e].Me[2][0] * (ALocal[2] - ALocal[0])* (ALocal[2] - ALocal[0]));
-					
+						+ d_MyElem[e].Me[2][0] * (ALocal[2] - ALocal[0]) * (ALocal[2] - ALocal[0]));
+					B = sqrt(B2);
 
-					if (B2 <= 0.36)
+					if (B <= 0.6)
 					{
 						for (j = 0; j < 3; j++)
 							LHS += ALocal[j] * d_MyElem[e].ElmRowSum[LocalPos][j] / MuFeCore;
 						dF_dA += d_MyElem[e].ElmRowSum[LocalPos][LocalPos] / MuFeCore;
 						//		if (NRct == (NRCount - 1))
-						//	d_MyElem[e].Ve = 1 / MuFeCore;
+								//	d_MyElem[e].Ve = 1 / MuFeCore;
 					}
 					else
 					{
-						B = sqrt(B2);
-						V = 1 / MuFeCore + 3000.0*(B - 0.6) *(B - 0.6) *(B - 0.6) / B;
-						VB2 = (B*9000.0*(B - 0.6)*(B - 0.6)  - 3000.0*(B - 0.6)*(B - 0.6) *(B - 0.6) ) / B / B / 2 / B;
+						V = 1 / MuFeCore + 3000.0 * (B - 0.6) * (B - 0.6) * (B - 0.6) / B;
+						VB2 = (B * 9000.0 * (B - 0.6) * (B - 0.6) - 3000.0 * (B - 0.6) * (B - 0.6) * (B - 0.6)) / B / B / 2 / B;
 						B2A = 0;
 
 						for (j = 0; j < 3; j++)
@@ -441,7 +439,7 @@ __global__ void UpdateSolutiontoA1(int *d_NumNodes, FEMElem* d_MyElem, FEMNode* 
 						dF_dA += V * d_MyElem[e].ElmRowSum[LocalPos][LocalPos];
 						LHS += temp * V;
 						//		if (NRct == (NRCount - 1))
-						//		d_MyElem[e].Ve = V;
+							//		d_MyElem[e].Ve = V;
 					}
 				}
 				else
@@ -458,40 +456,37 @@ __global__ void UpdateSolutiontoA1(int *d_NumNodes, FEMElem* d_MyElem, FEMNode* 
 
 	}
 }
-__global__ void CopyA1ToA0(int *d_NumNodes, FEMElem* d_MyElem, FEMNode* d_MyNode)
+__global__ void CopyA1ToA0(int* d_NumNodes, FEMElem* d_MyElem, FEMNode* d_MyNode)
 {
-	int i = threadIdx.x + blockIdx.x*blockDim.x;
+	int i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i >= *d_NumNodes)
 		return;
 	d_MyNode[i].A0 = d_MyNode[i].A1;
 }
-__global__ void UpdateVe(int *d_NumElem, FEMElem* d_MyElem, FEMNode* d_MyNode)
+__global__ void UpdateVe(int* d_NumElem, FEMElem* d_MyElem, FEMNode* d_MyNode)
 {
 	int e;
-	e = threadIdx.x + blockIdx.x*blockDim.x;
-	if (e >= *d_NumElem || d_MyElem[e].Type != 2)
+	e = threadIdx.x + blockIdx.x * blockDim.x;
+	if (e >= *d_NumElem || 0)
 		return;
 	double ALocal[3], B2, B, V;
 	ALocal[0] = d_MyNode[d_MyElem[e].Nodes[0]].A0;
 	ALocal[1] = d_MyNode[d_MyElem[e].Nodes[1]].A0;
 	ALocal[2] = d_MyNode[d_MyElem[e].Nodes[2]].A0;
-	B2 = -1 / d_MyElem[e].Area*(d_MyElem[e].Me[0][1] * (ALocal[0] - ALocal[1])* (ALocal[0] - ALocal[1])
-		+ d_MyElem[e].Me[1][2] * (ALocal[1] - ALocal[2])* (ALocal[1] - ALocal[2])
-		+ d_MyElem[e].Me[2][0] * (ALocal[2] - ALocal[0])* (ALocal[2] - ALocal[0]));
-	
-	if (B2 <= 0.36)
+	B2 = -1 / d_MyElem[e].Area * (d_MyElem[e].Me[0][1] * (ALocal[0] - ALocal[1]) * (ALocal[0] - ALocal[1])
+		+ d_MyElem[e].Me[1][2] * (ALocal[1] - ALocal[2]) * (ALocal[1] - ALocal[2])
+		+ d_MyElem[e].Me[2][0] * (ALocal[2] - ALocal[0]) * (ALocal[2] - ALocal[0]));
+	B = sqrt(B2);
+	if (B <= 0.6)
 		V = 1 / MuFeCore;
 	else
-	{
-		B = sqrt(B2);
-		V = 1 / MuFeCore + 3000.0*(B - 0.6) *(B - 0.6) *(B - 0.6) / B;
-	}
+		V = 1 / MuFeCore + 3000.0 * (B - 0.6) * (B - 0.6) * (B - 0.6) / B;
 	d_MyElem[e].Ve = V;
 }
-__global__ void Updategamma1OnDevice(int *d_NumElem, FEMElem* d_MyElem, FEMNode* d_MyNode, double *d_gamma1)
+__global__ void Updategamma1OnDevice(int* d_NumElem, FEMElem* d_MyElem, FEMNode* d_MyNode, double* d_gamma1)
 {
 	int e;
-	e = threadIdx.x + blockIdx.x*blockDim.x;
+	e = threadIdx.x + blockIdx.x * blockDim.x;
 	if (e >= *d_NumElem)
 		return;
 	int j, k;
@@ -552,14 +547,35 @@ void GPUFree()
 	cudaFree(d_gamma1);
 	cudaFree(d_CurrentDensity);
 }
-
+//for the test
+double My_abs(double x)
+{
+	if (x >= 0)
+		return x;
+	else
+		return -x;
+}
+double PorbeValueVsItration[3000];
+void MyUpdategamma1(double danteng)
+{
+	cudaMemcpy(d_gamma1, &danteng, sizeof(double), cudaMemcpyHostToDevice);
+	Updategamma1OnDevice << <CudaBlckNum, CudaThrdNum >> > (d_NumElem, d_MyElem, d_MyNode, d_gamma1);
+}
 int main() {
 
 	FEM_Host_Data_Prepare();
 	GPUInitialMallocCopy();
+	int probeID = -1;
+	//find the beloved probe node
+	for (int i = 1; i < NumNodes; i++)
+		if (My_abs(0.25 - MyNode[i].x) < 1e-13)
+			if (My_abs(1.30 - MyNode[i].y) < 1e-13)
+				probeID = i;
+	printf("\nprobeID=%d\n", probeID);
+
 
 	//Set currentdensity on device
-	CurrentDensity = 1.43e6;
+	CurrentDensity = 8e3;
 	cudaMemcpy(d_CurrentDensity, &CurrentDensity, sizeof(double), cudaMemcpyHostToDevice);
 	ApplyCurrent << <CudaBlckNum, CudaThrdNum >> > (d_CurrentDensity, d_NumElem, d_MyElem);
 
@@ -567,67 +583,51 @@ int main() {
 	JsSumCalculate << <CudaBlckNum, CudaThrdNum >> > (d_NumNodes, d_MyElem, d_MyNode);
 	SumNeiborJsSumCalculate << <CudaBlckNum, CudaThrdNum >> > (d_NumNodes, d_MyElem, d_MyNode);
 	//gamma1 prepare
-	gamma1 = 1000.0;
+	gamma1 = 5.0;
 	cudaMemcpy(d_gamma1, &gamma1, sizeof(double), cudaMemcpyHostToDevice);
 	Updategamma1OnDevice << <CudaBlckNum, CudaThrdNum >> > (d_NumElem, d_MyElem, d_MyNode, d_gamma1);
+
 
 	cudaEvent_t start, stop;//unit: ms
 
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop);
 	cudaEventRecord(start, 0);
-
 	for (int RelaxCount = 0; RelaxCount < 1000; RelaxCount++)
 	{
-
-		if (RelaxCount == 50)
-		{
-			gamma1 = 60.0;
-			cudaMemcpy(d_gamma1, &gamma1, sizeof(double), cudaMemcpyHostToDevice);
-			Updategamma1OnDevice << <CudaBlckNum, CudaThrdNum >> > (d_NumElem, d_MyElem, d_MyNode, d_gamma1);
-		}
-		if (RelaxCount == 100)
-		{
-			gamma1 = 10.0;
-			cudaMemcpy(d_gamma1, &gamma1, sizeof(double), cudaMemcpyHostToDevice);
-			Updategamma1OnDevice << <CudaBlckNum, CudaThrdNum >> > (d_NumElem, d_MyElem, d_MyNode, d_gamma1);
-		}
-		if (RelaxCount == 200)
-		{
-			gamma1 = 6.0;
-			cudaMemcpy(d_gamma1, &gamma1, sizeof(double), cudaMemcpyHostToDevice);
-			Updategamma1OnDevice << <CudaBlckNum, CudaThrdNum >> > (d_NumElem, d_MyElem, d_MyNode, d_gamma1);
-		}
-		if (RelaxCount == 500)
-		{
-			gamma1 = 5.5;
-			cudaMemcpy(d_gamma1, &gamma1, sizeof(double), cudaMemcpyHostToDevice);
-			Updategamma1OnDevice << <CudaBlckNum, CudaThrdNum >> > (d_NumElem, d_MyElem, d_MyNode, d_gamma1);
-		}
+		//if (RelaxCount == 2000) MyUpdategamma1(4.9);
+		//if (RelaxCount ==40) MyUpdategamma1(3.3);
+		//if (RelaxCount == 30) MyUpdategamma1(5.0);
+		//if (RelaxCount == 2000) MyUpdategamma1(6.2);
 		ElmRHSContriCalculate << <CudaBlckNum, CudaThrdNum >> > (d_NumElem, d_MyElem, d_MyNode);
-		SumNodeRHSContriCalculate << <CudaBlckNum, CudaThrdNum >> > (d_NumNodes, d_MyElem, d_MyNode);
-		UpdateSolutiontoA1 << <CudaBlckNum, CudaThrdNum >> > (d_NumNodes, d_MyElem, d_MyNode, d_gamma1);
-		CopyA1ToA0 << <CudaBlckNum, CudaThrdNum >> > (d_NumNodes, d_MyElem, d_MyNode);
-		UpdateVe << <CudaBlckNum, CudaThrdNum >> > (d_NumElem, d_MyElem, d_MyNode);
-	}
 
+		SumNodeRHSContriCalculate << <CudaBlckNum, CudaThrdNum >> > (d_NumNodes, d_MyElem, d_MyNode);
+
+		UpdateSolutiontoA1 << <CudaBlckNum, CudaThrdNum >> > (d_NumNodes, d_MyElem, d_MyNode, d_gamma1);
+
+		CopyA1ToA0 << <CudaBlckNum, CudaThrdNum >> > (d_NumNodes, d_MyElem, d_MyNode);
+
+		UpdateVe << <CudaBlckNum, CudaThrdNum >> > (d_NumElem, d_MyElem, d_MyNode);
+
+		//cudaMemcpy(&PorbeValueVsItration[RelaxCount], &(d_MyNode[probeID].A0), sizeof(double), cudaMemcpyDeviceToHost);
+	}
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
 	float elapsedTime;
 	cudaEventElapsedTime(&elapsedTime, start, stop);
-	
-
+	printf("\nElapsed time for NDDR Iteration is %.4f ms\n", elapsedTime);
 	cudaMemcpy(&MyElem, d_MyElem, NumElem * sizeof(FEMElem), cudaMemcpyDeviceToHost);
 	cudaMemcpy(&MyNode, d_MyNode, NumNodes * sizeof(FEMNode), cudaMemcpyDeviceToHost);
 	GPUFree();
 
-	printf("%e \n", MyNode[800].A0);
-
-
-	printf("\nElapsed time for NDDR Iteration is %.4f ms\n", elapsedTime);
-
+	printf("\n%e\n", MyNode[probeID].A0);
+	//for the test
+	FILE* write_ptr;
+	write_ptr = fopen("PorbeValueVsItration.bin", "wb");  // w for write, b for binary
+	fwrite(PorbeValueVsItration, sizeof(PorbeValueVsItration), 1, write_ptr);
+	//for the test
 
 	return 0;
-
-
 }
+
+
