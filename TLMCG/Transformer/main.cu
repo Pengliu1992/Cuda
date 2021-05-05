@@ -25,9 +25,12 @@ typedef struct
 
 #define CudaBlckNum 32
 #define CudaThrdNum 32
-#define NumOfNodes 320
-#define NumOfElems 578
-#define Delt (0.01)
+#define NumOfNodes 358
+#define NumOfElems 662
+#define Delt (1.0/60.0/100.0)
+#define TotalTimepoint 50
+#define Mu0 1.256637e-6
+#define pi 3.1415926
 
 typedef struct
 {
@@ -35,7 +38,7 @@ typedef struct
 	int EleID[10];
 	int EleOrd[10];
 	int Type;
-	float Jext;
+	float Jext[2];
 	float Jeddy = 0.0;
 	float A;// not in use-> relpaced by float *d_x outside of struct
 	float A1;// not in use-> relpaced by float *d_x outside of struct
@@ -47,7 +50,7 @@ typedef struct
 	int I, J, K;
 	int Type;
 	float Ve;
-	float Kc[3][3];//Kc ºÍG01 G12µÈñîºÏµÄ¡£×¢ÒâÖ»±£ÁôÆäÖÐÒ»¸ö
+	float Kc[3][3];//Kc ï¿½ï¿½G01 G12ï¿½ï¿½ï¿½ï¿½ÏµÄ¡ï¿½×¢ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½
 	float Dp[3][3];
 	float MatrixMultiVecBuff[3];
 	float Dp1;
@@ -112,7 +115,7 @@ void LoadMeshInfoAndPrepareFEM()
 	if ((ip = fopen(filename, "r")) == NULL) {
 		printf("error opening the input data.\n");
 	}
-	printf("Num_nodes %d", NumNodes);
+	printf("Num_nodes %d\n", NumNodes);
 
 	double *X, *Y;
 	X = (double *)malloc(NumNodes * sizeof(double));
@@ -143,7 +146,7 @@ void LoadMeshInfoAndPrepareFEM()
 			{
 				sscanf(line, "%d", &(NumElems));
 				fgets(line, sizeof(line), ip);
-				printf("Num_elems %d", NumElems);
+				//printf("Num_elems %d\n", NumElems);
 				for (i = 0; i < NumElems; i++)
 				{
 					fgets(line, sizeof(line), ip);
@@ -167,7 +170,7 @@ void LoadMeshInfoAndPrepareFEM()
 			{
 				sscanf(line, "%d", &(NumElems));
 				fgets(line, sizeof(line), ip);
-				printf("Num_elems %d", NumElems);
+				printf("Num_elems %d\n", NumElems);
 				for (i = 0; i < NumElems; i++)
 				{
 					fgets(line, sizeof(line), ip);
@@ -203,11 +206,11 @@ void LoadMeshInfoAndPrepareFEM()
 	//mark boundary nodes and set Jext to 0
 	for (i = 0; i < NumNodes; i++)
 	{
-		if (abs((long)X[i]) >= 0.99 || abs((long)Y[i]) >= 0.99)
+		if (X[i] <-3.499 || X[i] > 3.499 || Y[i] < -2.499 || Y[i] >2.499)
 			MyNode[i].Type = 1;
 		else
 			MyNode[i].Type = 0;
-		MyNode[i].Jext = 0.0;
+		MyNode[i].Jext[0] = 0.0; MyNode[i].Jext[1] = 0.0;
 		MyNode[i].A = 0.0;
 		MyNode[i].A1 = 0.0;
 	}
@@ -216,20 +219,39 @@ void LoadMeshInfoAndPrepareFEM()
 	//Get Stiff and Dampinmg matrix and add to Node.Jext
 	double x1, y1, x2, y2, x3, y3, Area;
 	double a1, b1, c1, a2, b2, c2, a3, b3, c3;
-	double sigma, Jext;
+	double sigma, Jext[2];
 	int I, J, K;
 	double G01, G20, G12;
 	for (i = 0; i < NumElems; i++)
 	{
-		sigma = 1.0;
-		MyElem[i].Ve = 1.0;
-		Jext = 0.0;
-		if (MyElem[i].Type != -1000)
+		sigma = 0.0;
+		MyElem[i].Ve = 1.0 / Mu0;
+		Jext[0] = 0.0; Jext[1] = 0.0;
+		if (MyElem[i].Type == 5)
 		{
-			sigma = 1.0;
-			MyElem[i].Ve = 1.0;
-			Jext = 3.21;
+			Jext[0] = 1.0;
 		}
+		if (MyElem[i].Type == 7)
+		{
+			Jext[0] = -1.0;
+		}
+		if (MyElem[i].Type == 4)
+		{
+			Jext[1] = 1.0;
+		}
+		if (MyElem[i].Type == 8)
+		{
+			Jext[1] = -1.0;
+		}
+
+		if (MyElem[i].Type == 2)
+		{
+			MyElem[i].Ve = 800.0;
+			sigma = 1000.0;
+		}
+
+
+
 		I = MyElem[i].I; J = MyElem[i].J; K = MyElem[i].K;
 		x1 = X[I]; x2 = X[J]; x3 = X[K];
 		y1 = Y[I]; y2 = Y[J]; y3 = Y[K];
@@ -248,7 +270,7 @@ void LoadMeshInfoAndPrepareFEM()
 		for (int ii = 0; ii < 3; ii++)
 			MyElem[i].Dp[ii][ii] = MyElem[i].Dp2;
 
-		G01 = 1.0 / 4  / Area * (b1 * b2 + c1 * c2);
+		G01 = 1.0 / 4 / Area * (b1 * b2 + c1 * c2);
 		G20 = 1.0 / 4 / Area * (b1 * b3 + c1 * c3);
 		G12 = 1.0 / 4 / Area * (b3 * b2 + c3 * c2);
 
@@ -264,15 +286,19 @@ void LoadMeshInfoAndPrepareFEM()
 		MyElem[i].Kc[2][1] = (float)G12;
 		MyElem[i].Kc[2][2] = (float)(-G20 - G12);
 
-		MyNode[I].Jext += (float)Area / 3.0*Jext;
-		MyNode[J].Jext += (float)Area / 3.0*Jext;
-		MyNode[K].Jext += (float)Area / 3.0*Jext;
-
+		MyNode[I].Jext[0] += (float)Area / 3.0*Jext[0];
+		MyNode[J].Jext[0] += (float)Area / 3.0*Jext[0];
+		MyNode[K].Jext[0] += (float)Area / 3.0*Jext[0];
+		MyNode[I].Jext[1] += (float)Area / 3.0*Jext[1];
+		MyNode[J].Jext[1] += (float)Area / 3.0*Jext[1];
+		MyNode[K].Jext[1] += (float)Area / 3.0*Jext[1];
 	}
 
 	for (i = 0; i < NumNodes; i++)
 		if (MyNode[i].Type == 1)
-			MyNode[i].Jext = 0.0;
+		{
+			MyNode[i].Jext[0] = 0.0; MyNode[i].Jext[1] = 0.0;
+		}
 	//Get Stiff and Dampinmg matrix and add to Node.Jext done
 
 	free(X); free(Y);
@@ -480,13 +506,14 @@ __global__ void reduction_2X(float * Vector1, float* aim1, float * Vector2, floa
 
 
 // FEM JExcitation->PcgVec.b
-__global__ void UpdateExcitationSumTo_PCGSolver(FEMNode* d_MyNode, PcgVec *d_PcgVec, int *d_NumNodes)
+__global__ void UpdateExcitationSumTo_PCGSolver(FEMNode* d_MyNode, PcgVec *d_PcgVec, int *d_NumNodes, float Iamp0, float Iamp1)
 {
 	int nd = threadIdx.x + blockIdx.x*blockDim.x;
 	if (nd >= *d_NumNodes)
 		return;
 
-	d_PcgVec[nd].b = d_MyNode[nd].Jext + d_MyNode[nd].TLM_Eq_Jsource + d_MyNode[nd].Jeddy;
+	d_PcgVec[nd].b = Iamp0 * d_MyNode[nd].Jext[0] + Iamp1 * d_MyNode[nd].Jext[1]+
+					d_MyNode[nd].TLM_Eq_Jsource + d_MyNode[nd].Jeddy;
 }
 
 
@@ -694,7 +721,7 @@ __device__ float Newton_Raphson_Element(float *Vr, float *Vi, float Ve, float *K
 	else
 	{
 		for (i = 0; i < 3; i++)
-			Y[i] = Kc[i] * Ve;//Êµ¼ÊÓÐ¸ö·ûºÅ¡£Ö»ÊÇÎªÁËºÍÔ­À´µÄ³ÌÐò±£³ÖÒ»ÖÂ
+			Y[i] = Kc[i] * Ve;//Êµï¿½ï¿½ï¿½Ð¸ï¿½ï¿½ï¿½ï¿½Å¡ï¿½Ö»ï¿½ï¿½Îªï¿½Ëºï¿½Ô­ï¿½ï¿½ï¿½Ä³ï¿½ï¿½ò±£³ï¿½Ò»ï¿½ï¿½
 
 		while (count < 10)
 			//while(count<10)
@@ -706,14 +733,14 @@ __device__ float Newton_Raphson_Element(float *Vr, float *Vi, float Ve, float *K
 				B2 += B2terms[i] * (Vi[i] + Vr[i])*(Vi[i] + Vr[i]);
 			B = sqrt(B2);
 			//---------------------------------------modify nonliear curve here below
-			if (B < 0.6)
+			if (B <= 0.6)
 			{
-				VeAtB = 2.0;
+				VeAtB = 800.0;
 				dVeAtB_dB2 = 0.0;
 			}
 			else
 			{
-				VeAtB = 2.0 + 1e5 * pow(B - 0.6, 3) / B;
+				VeAtB = 800.0 + 1e5 * pow(B - 0.6, 3) / B;
 				dVeAtB_dB2 = (B * 3e5 * pow(B - 0.6, 2) - 1e5 * pow(B - 0.6, 3)) / B / B / 2 / B;
 			}
 			//---------------------------------------modify nonliear curve here above
@@ -749,9 +776,9 @@ __global__ void NonlinearElementsUpdate_Ve_And_EquvJSource(FEMElem* d_MyElem, in
 	int e = threadIdx.x + blockIdx.x*blockDim.x;
 	if (e >= *d_NumElems)
 		return;
-	//	if (d_MyElem[e].Type != 1)//nonliaer elements geometry group
-		//	return;
-		//Local Node ID
+	if (d_MyElem[e].Type != 2)//nonliaer elements geometry group
+		return;
+	//Local Node ID
 	int I = d_MyElem[e].I; int J = d_MyElem[e].J; int K = d_MyElem[e].K;
 
 	float Vr[3];//copy to Local
@@ -821,28 +848,28 @@ __global__ void EachNodeExtractFromElemIeqInto_NodeIeq(FEMElem* d_MyElem, FEMNod
 
 PcgVec wocaonima[320];
 
-void TLM_MatrixFree_Solve_for_this_timepoint()
+void TLM_MatrixFree_Solve_for_this_timepoint(float Iamp0,float Iamp1)
 {
 	int wannaupdateve = 0;
 	cudaMemcpy(d_WannaUpdateVe, &wannaupdateve, sizeof(int), cudaMemcpyHostToDevice);
-	for (int TLMct = 0; TLMct < 6; TLMct++)
+	for (int TLMct = 0; TLMct < 4; TLMct++)
 	{
-		if (TLMct == 5)
+		if (TLMct == 3)
 		{
-			wannaupdateve = 0;
+			wannaupdateve = 1;
 			cudaMemcpy(d_WannaUpdateVe, &wannaupdateve, sizeof(int), cudaMemcpyHostToDevice);
 		}
-		UpdateExcitationSumTo_PCGSolver << <CudaBlckNum, CudaThrdNum >> > (d_MyNode, d_PcgVec, d_NumNodes);
-		cudaMemcpy(&wocaonima, d_PcgVec, 320 * sizeof(PcgVec), cudaMemcpyDeviceToHost);
+		UpdateExcitationSumTo_PCGSolver << <CudaBlckNum, CudaThrdNum >> > (d_MyNode, d_PcgVec, d_NumNodes, Iamp0, Iamp1);
+		//	cudaMemcpy(&wocaonima, d_PcgVec, 320 * sizeof(PcgVec), cudaMemcpyDeviceToHost);
 
 		CPU_PCG_Prepare();
-		for (int pcgit = 0; pcgit < 40; pcgit++)
+		for (int pcgit = 0; pcgit < 50; pcgit++)
 			PCGSolve_Ax_b();
 		NonlinearElementsUpdate_Ve_And_EquvJSource << <CudaBlckNum, CudaThrdNum >> > (d_MyElem, d_NumElems, d_x, d_WannaUpdateVe);
 		EachNodeExtractFromElemIeqInto_NodeIeq << <CudaBlckNum, CudaThrdNum >> > (d_MyElem, d_MyNode, d_NumNodes);
-		cudaMemcpy(&MyNode, d_MyNode, NumNodes * sizeof(FEMNode), cudaMemcpyDeviceToHost);
-		cudaMemcpy(&yinuonuo1, d_x, NumNodes * sizeof(float), cudaMemcpyDeviceToHost);
-		printf("%f\n", yinuonuo1[2]);
+		//cudaMemcpy(&MyNode, d_MyNode, NumNodes * sizeof(FEMNode), cudaMemcpyDeviceToHost);
+		//cudaMemcpy(&yinuonuo1, d_x, NumNodes * sizeof(float), cudaMemcpyDeviceToHost);
+		//printf("%e\n", yinuonuo1[161]);
 		//		for (int i = 0; i < 320; i++)
 		//		printf("  %f", MyNode[i].TLM_Eq_Jsource);
 	}
@@ -893,29 +920,154 @@ __global__ void EachNodeExtractFromElemBuffInto_Jeddy(FEMElem* d_MyElem, FEMNode
 }
 
 
+//Field-Circuit Coupling functions and vars
+float FaiOverT[2] = { 0,0 }, FaiPreviousOverT[2] = { 0,0 };
+float dFai_dIOverT[2][2] = { 0,0,0,0 };
+float AzatThisTimePoint[NumOfNodes];
+void ExtractFaiOverTFromFEM_d_x()
+{
+	cudaMemcpy(&AzatThisTimePoint, d_x, NumNodes * sizeof(float), cudaMemcpyDeviceToHost);
 
+	float temp;
+	for (int j = 0; j < 2; j++)
+	{
+		temp = 0;
+		for (int nd = 0; nd < NumNodes; nd++)
+			temp += MyNode[nd].Jext[j] * AzatThisTimePoint[nd];
+		FaiOverT[j] = temp / Delt;
+	}
+}
+
+//-------------FEM Jcoil d_fai_dI porbe->PcgVec.b
+__global__ void UpdateCoil1ProbeTo_PCGSolver(FEMNode* d_MyNode, PcgVec *d_PcgVec, int *d_NumNodes)
+{
+	int nd = threadIdx.x + blockIdx.x*blockDim.x;
+	if (nd >= *d_NumNodes)
+		return;
+	d_PcgVec[nd].b = d_MyNode[nd].Jext[0];
+}
+__global__ void UpdateCoil2ProbeTo_PCGSolver(FEMNode* d_MyNode, PcgVec *d_PcgVec, int *d_NumNodes)
+{
+	int nd = threadIdx.x + blockIdx.x*blockDim.x;
+	if (nd >= *d_NumNodes)
+		return;
+	d_PcgVec[nd].b = d_MyNode[nd].Jext[1];
+}
+float AzforCoilVoltage[NumOfNodes*2];
+void ExtractDfaiDIOverTFromFEM()
+{
+	UpdateCoil1ProbeTo_PCGSolver << <CudaBlckNum, CudaThrdNum >> > (d_MyNode, d_PcgVec, d_NumNodes);
+	CPU_PCG_Prepare();
+	for (int pcgit = 0; pcgit < 50; pcgit++)
+		PCGSolve_Ax_b();
+	cudaMemcpy(AzforCoilVoltage, d_x, NumNodes * sizeof(float), cudaMemcpyDeviceToHost);
+
+	UpdateCoil2ProbeTo_PCGSolver << <CudaBlckNum, CudaThrdNum >> > (d_MyNode, d_PcgVec, d_NumNodes);
+	CPU_PCG_Prepare();
+	for (int pcgit = 0; pcgit < 50; pcgit++)
+		PCGSolve_Ax_b();
+	cudaMemcpy(AzforCoilVoltage+NumNodes, d_x, NumNodes * sizeof(float), cudaMemcpyDeviceToHost);
+
+
+	float temp;
+	for (int i = 0; i < 2; i++)
+		for (int j = i; j < 2; j++)
+		{
+			temp = 0;
+			for (int Eg = 0; Eg < NumNodes; Eg++)
+				temp += AzforCoilVoltage[Eg + j * NumNodes] * MyNode[Eg].Jext[i];//dFai_dI = 0.845182542371954;	
+			dFai_dIOverT[i][j] = temp / Delt;
+
+		}
+	for (int i = 0; i < 2; i++)
+		for (int j = i + 1; j < 2; j++)
+			dFai_dIOverT[j][i] = dFai_dIOverT[i][j];
+}
+
+//-------------circuit solver
+float IAmp[2] = { 1e-10,1e-10 }, dI[2] = { 0.0,0.0 };
+float Vs[2] = { 0.0,0.0 };
+float R[2][2] = { 1.5,0.0,
+				  0.0, 100.0 };
+void CircuitFindDeltaI(int t)
+{
+	float RHS[2];
+
+	Vs[0] = 60000.0*sin(2.0*pi*60.0*Delt*(float)(t+1));
+	
+
+	//dI[]=(Vs[]-[Fai/dt[]-FaiPrevious/dt[]]-IAmp[]*R[][])/(R[][]+dFai_dIOverT[][])
+	for (int i = 0; i < 2; i++)
+	{
+		RHS[i] = Vs[i] - (FaiOverT[i] - FaiPreviousOverT[i]) - IAmp[i] * R[i][i];
+		dFai_dIOverT[i][i] += R[i][i];
+	}
+
+	//dFai_dIOverT[0][0] = 10.0; dFai_dIOverT[0][1] = 0.0; RHS[0] = 6.6;
+	//dFai_dIOverT[1][0] = 0.0; dFai_dIOverT[1][1] = 2.0; RHS[1] = 16.6;
+
+	//dI[2]=dFai_dIOverT[2][2]\RHS[2]
+	dI[0] = (RHS[0] * dFai_dIOverT[1][1] - RHS[1] * dFai_dIOverT[0][1]) /
+		(dFai_dIOverT[0][0] * dFai_dIOverT[1][1] - dFai_dIOverT[1][0] * dFai_dIOverT[0][1]);
+	dI[1] = (RHS[1] * dFai_dIOverT[0][0] - RHS[0] * dFai_dIOverT[1][0]) /
+		(dFai_dIOverT[0][0] * dFai_dIOverT[1][1] - dFai_dIOverT[1][0] * dFai_dIOverT[0][1]);
+
+	//see[t]=(IAmp[3] + dI[3] + Icap_eq[0]) * Req;
+
+
+
+}
+
+//-------------interface func
+void FieldCircuitCoSimuForThisTimepoint(int t)
+{
+	for (int InterCircuitFEMiteration = 0; InterCircuitFEMiteration < 3; InterCircuitFEMiteration++)
+	{
+		//Start: Fai,dFai_dI and Fai=FEM(lastA+Inow)
+		TLM_MatrixFree_Solve_for_this_timepoint(IAmp[0], IAmp[1]);
+		ExtractFaiOverTFromFEM_d_x();
+		ExtractDfaiDIOverTFromFEM();
+		//Finish: Fai,dFai_dI and Fai=FEM(lastA+Inow)
+
+		//dI=CircuitFindDI(Fai,Faipv,dfaidi), I=I+dI
+		CircuitFindDeltaI(t);
+
+		for (int j = 0; j < 2; j++)
+			IAmp[j] += dI[j];
+
+		//printf("\n Circuit: %e  Field: %e", (IAmp[3] + Icap_eq[0]) * Req, FaiOverT[3] - FaiPreviousOverT[3]);
+	}
+
+	//see[t] = FaiOverT[3] - FaiPreviousOverT[3];
+	for (int j = 0; j < 2; j++)
+		FaiPreviousOverT[j] = FaiOverT[j];
+
+	//Copy AzatThisTimePoint to d_x because d_x is changed in function ExtractDfaiDIOverTFromFEM();
+	//this must be done for eddy current terms
+	cudaMemcpy(d_x, AzatThisTimePoint, NumNodes * sizeof(float), cudaMemcpyHostToDevice);
+}
+
+float CenterAzvsT[TotalTimepoint];
 int main()
 {
 
 	LoadMeshInfoAndPrepareFEM();
 	GPUMallocCopy();
 
+		for (int t = 0; t < 3; t++)
+		{
+			ElmentLocal_MtxDp_Dot_d_x << <CudaBlckNum, CudaThrdNum >> > (d_MyElem, d_MyNode, d_NumElems, d_x);
+			EachNodeExtractFromElemBuffInto_Jeddy << <CudaBlckNum, CudaThrdNum >> > (d_MyElem, d_MyNode, d_x, d_NumNodes);
+			FieldCircuitCoSimuForThisTimepoint(t);
+			CenterAzvsT[t]= AzatThisTimePoint[161];
+			printf("center Az[161]=%e,  Icoil1=%e, @t=%d\n", AzatThisTimePoint[161], IAmp[0],t);
+		}
+		//-----save for matlab
+		//FILE *ptr;
+		//ptr = fopen("CenterAzVsTime.bin", "wb"); 
+		//fwrite(CenterAzvsT, sizeof(CenterAzvsT), 1, ptr);
+		//fclose(ptr);
 
-	for (int t = 0; t < 10; t++)
-	{
-		ElmentLocal_MtxDp_Dot_d_x << <CudaBlckNum, CudaThrdNum >> > (d_MyElem, d_MyNode, d_NumElems, d_x);
-		EachNodeExtractFromElemBuffInto_Jeddy << <CudaBlckNum, CudaThrdNum >> > (d_MyElem, d_MyNode, d_x, d_NumNodes);
-
-		TLM_MatrixFree_Solve_for_this_timepoint();
-	}
-
-
-
-
-
-	cudaMemcpy(&yinuonuo1, d_x, NumNodes * sizeof(float), cudaMemcpyDeviceToHost);
-	//for (int i = 0; i < 320; i++)
-	//printf("  %f", yinuonuo1[i]);
 
 
 
