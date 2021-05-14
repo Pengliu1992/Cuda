@@ -91,11 +91,11 @@ float *d_alpha, *d_beta, *d_pap, *d_rz1, *d_rz0; //floating clouds PCG steping v
 void LoadMeshInfoAndPrepareFEM()
 {
 	FILE* ip;
-	int i, j, flag = 0;
+	int i, flag = 0;
 	char filename[50];
-	int line_size = 50;
+
 	char line[50];
-	char temp[50];
+	
 	sprintf(filename, "Untitled.mphtxt");
 
 
@@ -218,7 +218,7 @@ void LoadMeshInfoAndPrepareFEM()
 
 	//Get Stiff and Dampinmg matrix and add to Node.Jext
 	double x1, y1, x2, y2, x3, y3, Area;
-	double a1, b1, c1, a2, b2, c2, a3, b3, c3;
+	double b1, c1, b2, c2, b3, c3;
 	double sigma, Jext[2];
 	int I, J, K;
 	double G01, G20, G12;
@@ -257,9 +257,9 @@ void LoadMeshInfoAndPrepareFEM()
 		y1 = Y[I]; y2 = Y[J]; y3 = Y[K];
 		Area = 0.5*(x1*(y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
 		MyElem[i].Area = Area;
-		a1 = x2 * y3 - x3 * y2; b1 = y2 - y3; c1 = x3 - x2;
-		a2 = x3 * y1 - x1 * y3; b2 = y3 - y1; c2 = x1 - x3;
-		a3 = x1 * y2 - x2 * y1; b3 = y1 - y2; c3 = x2 - x1;
+		 b1 = y2 - y3; c1 = x3 - x2;
+		 b2 = y3 - y1; c2 = x1 - x3;
+		 b3 = y1 - y2; c3 = x2 - x1;
 
 		MyElem[i].Dp1 = (float)(sigma *Area / 12.0 / Delt);
 		MyElem[i].Dp2 = (float)(sigma * Area / 6.0 / Delt);
@@ -385,7 +385,7 @@ __global__ void ElmentLocal_MtxA_Dot_Vector(FEMElem* d_MyElem, FEMNode* d_MyNode
 	if (e >= *d_NumElems)
 		return;
 
-	int i, j, k;
+	int i, j;
 	float ALocal[3];
 	ALocal[0] = Vector[d_MyElem[e].I];
 	ALocal[1] = Vector[d_MyElem[e].J];
@@ -402,7 +402,7 @@ __global__ void EachNodeExtractFromElemBuffInto_Ap(FEMElem* d_MyElem, FEMNode* d
 	int nd = threadIdx.x + blockIdx.x*blockDim.x;
 	if (nd >= *d_NumNodes)
 		return;
-	int e, LocalPos, i, j, k;
+	int e, LocalPos, i;
 	float temp = 0;
 	if (d_MyNode[nd].Type == 0)
 	{
@@ -427,7 +427,7 @@ __global__ void Num3isNum1dividedbyNum2(float *Num3, float *Num1, float *Num2)
 }
 //-----------aim=sum_Vector
 __global__ void reduction(float * Vector, float* aim, int *d_NumNodes) {
-	extern __shared__ float sdata[5120];
+    __shared__ float sdata[5120];
 	// each thread loads one element from global to shared mem
 	unsigned int tid = threadIdx.x;
 
@@ -438,7 +438,7 @@ __global__ void reduction(float * Vector, float* aim, int *d_NumNodes) {
 		if ((tid + 128 * ii) < (*d_NumNodes))
 			sdata[tid + 128 * ii] = Vector[tid + 128 * ii];
 	__syncthreads();
-	float temp;
+
 	for (int ii = 1; ii < 40; ii++)
 		sdata[tid] += sdata[tid + 128 * ii];
 	__syncthreads();
@@ -457,8 +457,8 @@ __global__ void reduction(float * Vector, float* aim, int *d_NumNodes) {
 	}
 }
 __global__ void reduction_2X(float * Vector1, float* aim1, float * Vector2, float* aim2, int *d_NumNodes) {
-	extern __shared__ float sdata1[5120];
-	extern __shared__ float sdata2[5120];
+	 __shared__ float sdata1[5120];
+	 __shared__ float sdata2[5120];
 	// each thread loads one element from global to shared mem
 	unsigned int tid = threadIdx.x;
 
@@ -475,7 +475,7 @@ __global__ void reduction_2X(float * Vector1, float* aim1, float * Vector2, floa
 			sdata2[tid + 128 * ii] = Vector2[tid + 128 * ii];
 		}
 	__syncthreads();
-	float temp;
+	
 	for (int ii = 1; ii < 40; ii++)
 	{
 		sdata1[tid] += sdata1[tid + 128 * ii];
@@ -704,12 +704,11 @@ __device__ float Newton_Raphson_Element(float *Vr, float *Vi, float Ve, float *K
 
 
 	int count = 0, i, j;
-	float Vrtemp[3], dVr[3];
+	float dVr[3];
 	float Y[3];
 	float B = 0, B2;
 	float dB2_dVr[3];
 	float VeAtB, dVeAtB_dB2;
-	float Error = 1;
 	float Jacobian[3][3];
 	float Residual[3];
 
@@ -726,8 +725,8 @@ __device__ float Newton_Raphson_Element(float *Vr, float *Vi, float Ve, float *K
 		while (count < 10)
 			//while(count<10)
 		{
-			for (i = 0; i < 3; i++)
-				Vrtemp[i] = Vr[i];
+			//for (i = 0; i < 3; i++)
+				//Vrtemp[i] = Vr[i];
 			B2 = 0;
 			for (i = 0; i < 3; i++)
 				B2 += B2terms[i] * (Vi[i] + Vr[i])*(Vi[i] + Vr[i]);
@@ -824,7 +823,7 @@ __global__ void EachNodeExtractFromElemIeqInto_NodeIeq(FEMElem* d_MyElem, FEMNod
 	int nd = threadIdx.x + blockIdx.x*blockDim.x;
 	if (nd >= *d_NumNodes)
 		return;
-	int e, LocalPos, i, j, k;
+	int e, LocalPos, i;
 	float temp = 0;
 	if (d_MyNode[nd].Type == 0)
 	{
@@ -884,7 +883,7 @@ __global__ void ElmentLocal_MtxDp_Dot_d_x(FEMElem* d_MyElem, FEMNode* d_MyNode, 
 	if (e >= *d_NumElems)
 		return;
 
-	int i, j, k;
+	int i, j;
 	float ALocal[3];
 	ALocal[0] = d_x[d_MyElem[e].I];
 	ALocal[1] = d_x[d_MyElem[e].J];
@@ -901,7 +900,7 @@ __global__ void EachNodeExtractFromElemBuffInto_Jeddy(FEMElem* d_MyElem, FEMNode
 	int nd = threadIdx.x + blockIdx.x*blockDim.x;
 	if (nd >= *d_NumNodes)
 		return;
-	int e, LocalPos, i, j, k;
+	int e, LocalPos, i;
 	float temp = 0;
 	if (d_MyNode[nd].Type == 0)
 	{
@@ -1054,6 +1053,12 @@ int main()
 	LoadMeshInfoAndPrepareFEM();
 	GPUMallocCopy();
 
+	cudaEvent_t start, stop;//unit: ms
+
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	cudaEventRecord(start, 0);
+
 		for (int t = 0; t < 3; t++)
 		{
 			ElmentLocal_MtxDp_Dot_d_x << <CudaBlckNum, CudaThrdNum >> > (d_MyElem, d_MyNode, d_NumElems, d_x);
@@ -1062,14 +1067,17 @@ int main()
 			CenterAzvsT[t]= AzatThisTimePoint[161];
 			printf("center Az[161]=%e,  Icoil1=%e, @t=%d\n", AzatThisTimePoint[161], IAmp[0],t);
 		}
+
+	cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+	float elapsedTime;
+	cudaEventElapsedTime(&elapsedTime, start, stop);
+	printf("\nElapsed time for NDDR Iteration is %.4f ms\n", elapsedTime);
 		//-----save for matlab
 		//FILE *ptr;
 		//ptr = fopen("CenterAzVsTime.bin", "wb"); 
 		//fwrite(CenterAzvsT, sizeof(CenterAzvsT), 1, ptr);
 		//fclose(ptr);
-
-
-
 
 	GPUFree();
 
