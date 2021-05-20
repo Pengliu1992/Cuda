@@ -5,8 +5,8 @@
 #define SigmaE  0
 #define Mu0 1.256637e-6
 #define pi 3.1415927
-#define Delt (0.05e-6)
-#define MaxStep 2001
+#define Delt (0.1e-3)
+#define MaxStep 501
 #define Np 132
 #define Ns 39
 #define CoilArea 0.5
@@ -18,7 +18,7 @@
 #define VRMS 220000
 #define NR1 (1.3332*0*Np/40)
 #define NR2 (0.6666*0*Ns/20)
-#define Freq 300000
+#define Freq 60
 
 #define Level 5
 #define NoC 4//(level-1)
@@ -94,7 +94,7 @@ double A0[MaxNodeNumber], A0p[MaxNodeNumber], A0s[MaxNodeNumber];
 //Global parameters for circuit
 
 
-double R1=5,R2=100000,L1=0,L2=0;
+double R1=5,R2=100,L1=0,L2=0;
 
 
 double Lw1,Lw2,Lm1,Lm2,dIp=1,dIs=1;	
@@ -149,19 +149,20 @@ int main(){
 			Ip2 = Ipr[Time_Step];
 			Is2 = Ise[Time_Step];
 
+
 		}
 
 
 		Ihis1 = Ipr[Time_Step] * 2 - Ihis1;
 		Ihis2 = Ise[Time_Step] * 2 - Ihis2;
 
-	/*	if (Time_Step % 10 == 9)
+		if (Time_Step % 10 == 9)
 		{
 
 			Apply_Memory_Adm_Matr();
 
 			printf("Memory Admt Matrix Applied on %d Time Step\n", Time_Step);
-		}*/
+		}
 	
 	}
 	GET_TIME(T_end);
